@@ -1,0 +1,12 @@
+/node_modules
+*.jpeg
+*.png
+*jpg
+
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+/package-lock.json
+.env.development

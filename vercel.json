@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "src/index.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "src/index.js"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/updateBookingStatus",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/autoDeleteOldPendingBookings",
+      "schedule": "30 1 * * *"
+    }
+  ]
+}
