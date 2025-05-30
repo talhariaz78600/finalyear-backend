@@ -5,7 +5,7 @@ const validator = require('validator');
 const { PhoneNumberUtil } = require('google-libphonenumber');
 const { TypeCheck } = require('../../utils/helpers');
 const { roles } = require('../../utils/types');
-const { globalPreferencesSchema } = require('../GlobalPreference');
+
 
 const phoneUtil = PhoneNumberUtil.getInstance();
 
@@ -51,75 +51,6 @@ const userSchema = new Schema(
         message: 'Invalid phone number for the specified country'
       }
     },
-    officeContact: {
-      type: String,
-      trim: true,
-      validate: {
-        validator(value) {
-          if (!value) return true;
-          try {
-            const number = phoneUtil.parseAndKeepRawInput(value);
-            return phoneUtil.isValidNumber(number);
-          } catch (error) {
-            return false;
-          }
-        },
-        message: 'Invalid phone number for the specified country'
-      }
-    },
-    emergencyContact: {
-      type: String,
-      trim: true,
-      validate: {
-        validator(value) {
-          if (!value) return true;
-          try {
-            const number = phoneUtil.parseAndKeepRawInput(value);
-            return phoneUtil.isValidNumber(number);
-          } catch (error) {
-            return false;
-          }
-        },
-        message: 'Invalid phone number for the specified country'
-      }
-    },
-    companyName: {
-      type: String,
-      trim: true
-    },
-    countryCode: {
-      type: String,
-      // required: true,
-      trim: true,
-      validate: {
-        validator(value) {
-          return /^\+\d{1,4}$/.test(value);
-        },
-        message: 'Invalid country code'
-      }
-    },
-    officeCountryCode: {
-      type: String,
-      // required: true,
-      trim: true,
-      validate: {
-        validator(value) {
-          return /^\+\d{1,4}$/.test(value);
-        },
-        message: 'Invalid office country code'
-      }
-    },
-    emergencyCountryCode: {
-      type: String,
-      // required: true,
-      trim: true,
-      validate: {
-        validator(value) {
-          return /^\+\d{1,4}$/.test(value);
-        },
-        message: 'Invalid emergency country code'
-      }
-    },
     password: {
       type: String,
       select: false,
@@ -131,40 +62,10 @@ const userSchema = new Schema(
     },
     role: {
       type: String,
-      enum: [roles.ADMIN, roles.VENDOR, roles.CUSTOMER],
+      enum: [roles.ADMIN, roles.CLIENT, roles.DEVELOPER, roles.PROJECT_MANAGER],
       required: true
     },
-    emailVerified: {
-      type: Boolean,
-      default: false
-    },
-    contactVerified: {
-      type: Boolean,
-      default: false
-    },
-    kycCompleted: {
-      type: Boolean,
-      default: false
-    },
-    subscription: {
-      planId: { type: Schema.Types.ObjectId, ref: 'Plan' },
-      startDate: { type: Date },
-      endDate: { type: Date },
-      isActive: { type: Boolean, default: false },
-      planType: { type: String }
-    },
-    providers: {
-      type: [String],
-      enum: ['google', 'facebook', 'local']
-    },
-    googleId: {
-      type: String,
-      required: false // Only required for Google login
-    },
-    facebookId: {
-      type: String,
-      required: false // Only required for Facebook login
-    },
+
     profileCompleted: {
       type: Boolean,
       default: false
@@ -189,28 +90,11 @@ const userSchema = new Schema(
     status: {
       type: String,
       trim: true,
-      enum: ["Active", "Inactive", "Suspend", "Delete", 'Pending', 'Rejected'],
+      enum: ["Active", "Inactive", "Suspend", "Delete"],
       default: "Active"
     },
-    SleepMode: {
-      type: Boolean,
-      default: false
-    },
-    lastViewedServices: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: 'ServiceListing',
-      }
-    ],
-    globalPreferences:{
-      type:globalPreferencesSchema,
-      default:{
-        preferredLanguage: 'English',
-        preferredCurrency: 'USD',
-        timeZone: 'UTC',
-        calendarStartOfWeek: 'monday'
-      }
-    },
+
+
     lastLoginAt: Date,
     passwordChangedAt: Date,
     passwordResetToken: String,
@@ -218,10 +102,6 @@ const userSchema = new Schema(
     otpVerifiedAt: Date,
     otpExpiration: String,
     deactivatedAt: Date,
-    isDeactivated: {
-      type: Boolean,
-      default: false
-    },
     lastSeen: Date
   },
   {
@@ -287,31 +167,5 @@ userSchema.methods.createPasswordResetToken = function () {
   return resetToken;
 };
 
-// userSchema.pre('validate', function (next) {
-//   // Skip validation if the document is new (i.e., being created)
-//   if (this.isNew) {
-//     return next();
-//   }
-//   if (this.role === roles.VENDOR) {
-//     if (!this.contact) {
-//       return next(new Error('Contact is required for vendors.'));
-//     }
-//     if (!this.officeContact) {
-//       return next(new Error('Office Contact is required for vendors.'));
-//     }
-//     if (!this.emergencyContact) {
-//       return next(new Error('Emergency Contact is required for vendors.'));
-//     }
-//     if (!this.companyName) {
-//       return next(new Error('Company Name is required for vendors.'));
-//     }
-//   }
-//   if (this.role === roles.CUSTOMER) {
-//     if (!this.contact) {
-//       return next(new Error('Contact is required for customers.'));
-//     }
-//   }
-//   return next();
-// });
 
 module.exports = model('User', userSchema);

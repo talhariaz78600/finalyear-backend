@@ -9,7 +9,7 @@ const Email = require('../utils/email');
 
 const phoneUtil = PhoneNumberUtil.getInstance();
 const { roles } = require('../utils/types');
-const Vendor = require('../models/users/Vendor');
+const Vendor = require('../models/users/Developer');
 const joiError = require('../utils/joiError');
 
 const sendEmail = async (subject, email, text, data) => {

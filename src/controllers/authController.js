@@ -9,9 +9,10 @@ const Email = require('../utils/email');
 
 const phoneUtil = PhoneNumberUtil.getInstance();
 const { redisClient } = require('../config/redisConfig');
-const Customers = require('../models/users/Customer');
+const Client = require('../models/users/Client');
 const Admins = require('../models/users/Admin');
-const Vendors = require('../models/users/Vendor');
+const Developer = require('../models/users/Developer');
+const ProjectManager = require('../models/users/ProjectManager');
 
 const { roles } = require('../utils/types');
 const { registerUserSchema } = require('../utils/joi/userValidation');
@@ -130,7 +131,7 @@ const registerUser = catchAsync(async (req, res, next) => {
     ...req.body,
     contact: normalizedContact
   };
-  const validRoles = [roles.ADMIN, roles.VENDOR, roles.CUSTOMER];
+  const validRoles = [roles.ADMIN, roles.CLIENT, roles.DEVELOPER, roles.PROJECT_MANAGER];
   const userRole = UserData?.role?.toLowerCase();
   if (!validRoles.includes(userRole)) {
     return next(
@@ -140,12 +141,16 @@ const registerUser = catchAsync(async (req, res, next) => {
     );
   }
   let newUser;
-  if (UserData?.role === roles.CUSTOMER) {
-    newUser = new Customers(UserData);
+  if (UserData?.role === roles.CLIENT) {
+    newUser = new Client(UserData);
     await newUser.save({ validateBeforeSave: false });
-  } else if (UserData?.role === roles.VENDOR) {
+  } else if (UserData?.role === roles.PROJECT_MANAGER) {
     UserData.status = 'Pending';
-    newUser = new Vendors(UserData);
+    newUser = new ProjectManager(UserData);
+    await newUser.save({ validateBeforeSave: false });
+  } else if (UserData?.role === roles.DEVELOPER) {
+    UserData.status = 'Pending';
+    newUser = new Developer(UserData);
     await newUser.save({ validateBeforeSave: false });
   } else if (UserData?.role === roles.ADMIN) {
     newUser = new Admins(UserData);

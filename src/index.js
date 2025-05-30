@@ -7,7 +7,7 @@ const { connectDB } = require('./config/connectDb');
 const configMiddlewares = require('./config/configMiddlewares');
 const routes = require('./config/routes');
 // const { connectRedis } = require('./config/redisConfig');
-require("./utils/updateRequest");
+// require("./utils/updateRequest");
 
 const app = express();
 app.use(cookieParser());
