@@ -15,13 +15,14 @@ const Developer = require('../models/users/Developer');
 const ProjectManager = require('../models/users/ProjectManager');
 
 const { roles } = require('../utils/types');
-const { registerUserSchema } = require('../utils/joi/userValidation');
+const { registerUserSchema, userCreateSchema } = require('../utils/joi/userValidation');
 const {
   emailVerifySchema,
   emailOTPVerifySchema,
   LoginSchema
 } = require('../utils/joi/emailValidation');
 const { sendOtpVoiceCall, sendTwilioSms } = require('../utils/sendTwilioSms');
+const joiError = require('../utils/joiError');
 
 const signToken = (user, expires = process.env.JWT_EXPIRES_IN) => jwt.sign({ user }, process.env.JWT_SECRET, {
   expiresIn: expires
@@ -65,116 +66,34 @@ const createSendToken = (user, statusCode, res) => {
 const sendEmail = async (template, subject, email, data) => {
   await new Email(email, subject).send(template, subject, data);
 };
-
 const registerUser = catchAsync(async (req, res, next) => {
-  const { error } = registerUserSchema.validate(req.body, {
-    abortEarly: false
+  const { error } = userCreateSchema.validate(req.body, {
+    abortEarly: false,
+    allowUnknown: true
   });
 
   if (error) {
-    const errorFields = error.details.reduce((acc, err) => {
-      acc[err.context.key] = err.message.replace(/['"]/g, '');
-      return acc;
-    }, {});
-
+    const errorFields = joiError(error);
     return next(new AppError('Validation failed', 400, { errorFields }));
   }
 
-  const { email, contact, countryCode } = req.body;
+  const { email } = req.body;
 
-  let normalizedContact;
-  let regionCode;
+  const existingUser = await User.findOne({ email });
 
-  try {
-    const countryDialCode = parseInt(countryCode.replace('+', ''), 10);
-    regionCode = phoneUtil.getRegionCodeForCountryCode(countryDialCode);
-    if (!regionCode) throw new Error('Invalid country code.');
-
-    const number = phoneUtil.parseAndKeepRawInput(contact, regionCode);
-    if (!phoneUtil.isValidNumber(number) || !phoneUtil.isValidNumberForRegion(number, regionCode)) {
-      throw new Error('Invalid phone number for the specified country.');
-    }
-    normalizedContact = phoneUtil.format(number, PhoneNumberFormat.E164);
-  } catch (err) {
-    return next(new AppError('Validation failed', 400, { contact: err.message }));
+  if (existingUser) {
+    return next(new AppError('Email already exists!', 400, {
+      email: 'Email already exists!'
+    }));
   }
 
-  // Check if email or contact already exists
-  const existingUsers = await User.findOne({
-    $or: [{ email }, { contact: normalizedContact }]
-  });
+  const newUser = new Admins(req.body);
 
-  if (existingUsers && existingUsers?.status === "Delete") {
-    return next(new AppError('This account deleted by Admin. Please contact with Admin', 404));
-
-  }
-
-  if (existingUsers) {
-    if (existingUsers.email === email) {
-      return next(
-        new AppError('Email already exists!', 400, {
-          email: 'Email already exists!'
-        })
-      );
-    }
-    if (existingUsers.contact === normalizedContact) {
-      return next(
-        new AppError('Contact number already exists!', 400, {
-          contact: 'Contact number already exists!'
-        })
-      );
-    }
-  }
-
-  // Prepare user data
-  const UserData = {
-    ...req.body,
-    contact: normalizedContact
-  };
-  const validRoles = [roles.ADMIN, roles.CLIENT, roles.DEVELOPER, roles.PROJECT_MANAGER];
-  const userRole = UserData?.role?.toLowerCase();
-  if (!validRoles.includes(userRole)) {
-    return next(
-      new AppError('Invalid role provided', 400, {
-        role: 'Invalid role provided'
-      })
-    );
-  }
-  let newUser;
-  if (UserData?.role === roles.CLIENT) {
-    newUser = new Client(UserData);
-    await newUser.save({ validateBeforeSave: false });
-  } else if (UserData?.role === roles.PROJECT_MANAGER) {
-    UserData.status = 'Pending';
-    newUser = new ProjectManager(UserData);
-    await newUser.save({ validateBeforeSave: false });
-  } else if (UserData?.role === roles.DEVELOPER) {
-    UserData.status = 'Pending';
-    newUser = new Developer(UserData);
-    await newUser.save({ validateBeforeSave: false });
-  } else if (UserData?.role === roles.ADMIN) {
-    newUser = new Admins(UserData);
-    await newUser.save({ validateBeforeSave: false });
-  }
+  await newUser.save({ validateBeforeSave: false });
   res.locals.dataId = newUser._id;
   res.locals.actor = newUser;
 
-  return res.status(200).json({
-    status: 'success',
-    message: `Account created successfully for ${newUser.email}`,
-    data: {
-      _id: newUser._id,
-      fullName: newUser.fullName,
-      firstName: newUser.firstName,
-      lastName: newUser.lastName,
-      email: newUser.email,
-      contact: newUser.contact,
-      countryCode: newUser.countryCode,
-      role: newUser.role
-    },
-    dataId: newUser._id
-  });
-
+  await createSendToken(newUser, 201, res);
 });
 
 
@@ -524,21 +443,6 @@ const loginUser = catchAsync(async (req, res, next) => {
     return next(new AppError('Validation failed', 400, { errorFields }));
   }
 
-  // Set Redis key for login attempts with user ID or identifier as the key
-  // const loginAttemptsKey = `loginAttempts:${email}`;
-  // const MAX_ATTEMPTS = 8;
-  // const BLOCK_DURATION = 24 * 60 * 60; // 24 hours in seconds
-
-  // Check login attempts count in Redis
-  // const attempts = await redisClient.get(loginAttemptsKey);
-  // if (attempts >= MAX_ATTEMPTS) {
-  //   return next(
-  //     new AppError(
-  //       "Too many login attempts. Please try again after 24 hours.",
-  //       429
-  //     )
-  //   );
-  // }
 
   const user = await User.findOne({ email }).populate({ path: 'templateId' }).select('+password');
 
@@ -589,14 +493,14 @@ const loginUser = catchAsync(async (req, res, next) => {
   }
 
   // look if a user has email verified
-  if (!user.emailVerified) {
-    return next(
-      new AppError('Email Not Verified', 401, {
-        email: 'Email not verified',
-        redirect: true
-      })
-    );
-  }
+  // if (!user.emailVerified) {
+  //   return next(
+  //     new AppError('Email Not Verified', 401, {
+  //       email: 'Email not verified',
+  //       redirect: true
+  //     })
+  //   );
+  // }
 
   user.lastLoginAt = Date.now();
 
@@ -628,70 +532,6 @@ const loginUser = catchAsync(async (req, res, next) => {
     token,
     data: userData
   });
-});
-
-const googleCallback = catchAsync(async (req, res) => {
-  console.log('in google callback', req.query);
-
-  const isLinking = req.query.state === 'linking';
-  let token = '';
-
-  if (!req.user) {
-    const error = encodeURIComponent('Authentication failed. Please try again.');
-    return res.redirect(`${process.env.FRONTEND_URL}/login-error?error=${error}`);
-  }
-
-  if (!isLinking) {
-    token = signToken(req.user); // e.g., JWT
-  }
-
-  const userToSend = removeFields(req.user.toJSON(), [
-    'password',
-    'passwordChangedAt',
-    'passwordResetToken',
-    'passwordResetExpires',
-    'OTP',
-    'otpExpiration',
-    'otpVerifiedAt',
-    'permissions'
-  ]);
-
-  const redirectUrl = new URL(`${process.env.FRONTEND_URL}/login-success`);
-  redirectUrl.searchParams.set('token', token);
-  redirectUrl.searchParams.set('user', encodeURIComponent(JSON.stringify(userToSend)));
-
-  return res.redirect(redirectUrl.toString());
-});
-
-const facebookCallback = catchAsync(async (req, res) => {
-  console.log('in google callback', req.query);
-
-  // if the state is linking, we will create token
-  const isLinking = req.query.state === 'linking';
-
-  let token = '';
-
-  if (!isLinking) {
-    // create and send a token to frontend also
-    token = signToken(req.user);
-  }
-
-  const userToSend = removeFields(req.user.toJSON(), [
-    'password',
-    'passwordChangedAt',
-    'passwordResetToken',
-    'passwordResetExpires',
-    'OTP',
-    'otpExpiration',
-    'otpVerifiedAt',
-    'permissions'
-  ]);
-
-  const redirectUrl = new URL(`${process.env.FRONTEND_URL}/login-success`);
-  redirectUrl.searchParams.set('token', token);
-  redirectUrl.searchParams.set('user', encodeURIComponent(JSON.stringify(userToSend)));
-
-  return res.redirect(redirectUrl.toString());
 });
 
 
@@ -738,7 +578,7 @@ const forgotPassword = catchAsync(async (req, res, next) => {
   const origin = req.get('origin') || process.env.FRONTEND_URL;
 
   // Ensure correct reset URL based on request origin
-  const resetURL = `${origin}/auth/reset-password?token=${resetToken}`;
+  const resetURL = `${origin}/reset-password?token=${resetToken}`;
 
   // const resetURL = `${req.protocol}://${req.get('host')}/reset-password?token=${resetToken}`;
 
@@ -957,85 +797,14 @@ const createFirstPassword = catchAsync(async (req, res, next) => {
   });
 });
 
-const delinkGoogle = catchAsync(async (req, res, next) => {
-  const user = await User.findById(req.user._id);
-  if (!user) {
-    return next(new AppError('User not found', 404, { user: 'user not found' }));
-  }
 
-  if (!user.providers.includes('google')) {
-    return next(
-      new AppError('Google account is not linked', 400, {
-        google: 'Google account is not linked'
-      })
-    );
-  }
-
-  // Prevent delinking if it's the only login method
-  if (user.providers.length === 1) {
-    return next(
-      new AppError(
-        "Cannot remove Google as it's the only login method. Add another login method first.",
-        400
-      )
-    );
-  }
-
-  // Remove Google from providers and clear googleId
-  user.providers = user.providers.filter((provider) => provider !== 'google');
-  user.googleId = undefined;
-
-  await user.save();
-
-  return res.status(200).json({
-    success: true,
-    message: 'Google account successfully delinked.'
-  });
-});
-
-const delinkFacebook = catchAsync(async (req, res, next) => {
-  const user = await User.findById(req.user._id);
-  if (!user) {
-    return next(new AppError('User not found', 404, { user: 'user not found' }));
-  }
-
-  if (!user.providers.includes('facebook')) {
-    return next(
-      new AppError('Facebook account is not linked', 400, {
-        facebook: 'facebook account is not linked'
-      })
-    );
-  }
-
-  // Prevent delinking if it's the only login method
-  if (user.providers.length === 1) {
-    return next(
-      new AppError(
-        "Cannot remove Facebook as it's the only login method. Add another login method first.",
-        400
-      )
-    );
-  }
-
-  // Remove Facebook from providers and clear facebookId
-  user.providers = user.providers.filter((provider) => provider !== 'facebook');
-  user.googleId = undefined;
-
-  await user.save();
-
-  return res.status(200).json({
-    success: true,
-    message: 'Facebook account successfully delinked.'
-  });
-});
 
 
 
 module.exports = {
   registerUser,
   loginUser,
-  googleCallback,
-  facebookCallback,
+
   verifyotp,
   verifyPhoneotp,
   sendEmailVerification,
@@ -1044,8 +813,7 @@ module.exports = {
   verifyForgetOtp,
   resetPassword,
   createFirstPassword,
-  delinkGoogle,
-  delinkFacebook,
+
   resendOtp,
   resendOtpNumber,
   sendEmail,

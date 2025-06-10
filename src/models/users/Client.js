@@ -2,32 +2,17 @@ const { Schema } = require('mongoose');
 const User = require('./User');
 
 const clientSchema = new Schema({
-
-  companyName: {
+  companyName: { type: String },
+  contactNumber: { type: String },
+  address: { type: String },
+  projects: [{ type: Schema.Types.ObjectId, ref: 'Project' }],
+  joinedDate: { type: Date, default: Date.now },
+  status: {
     type: String,
-    required: true,
-    trim: true
+    enum: ['active', 'inactive', 'pending'],
+    default: 'active',
   },
-  contactPerson: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  projects: [
-    {
-      type: Schema.Types.ObjectId,
-      ref: 'Project'
-    }
-  ],
-  billingInfo: {
-    type: String,
-    trim: true
-  },
-  preferences: {
-    type: Object,
-    default: {}
-  }
-
+  notes: { type: String }, // Optional notes from the org/admin about this client
 });
 
-module.exports = User.discriminator('client', clientSchema);
+module.exports = User.discriminator('Client', clientSchema);

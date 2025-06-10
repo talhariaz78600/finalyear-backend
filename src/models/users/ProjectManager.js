@@ -2,13 +2,10 @@ const { Schema } = require('mongoose');
 const User = require('./User');
 
 const projectManagerSchema = new Schema({
-  permissions: [String],
-    projectsManaged: [
-        {
-        type: Schema.Types.ObjectId,
-        ref: 'Project'
-        }
-    ],
+  managedProjects: [{ type: Schema.Types.ObjectId, ref: 'Project' }],
+  department: { type: String }, // optional field
+  designation: { type: String }, // e.g. 'Senior PM'
+  experienceYears: { type: Number }, // optional field
 });
 
-module.exports = User.discriminator('projectManager', projectManagerSchema);
+module.exports = User.discriminator('ProjectManager', projectManagerSchema);
