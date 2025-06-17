@@ -5,7 +5,8 @@ const passport = require('passport');
 const cookieParser = require('cookie-parser');
 const { connectDB } = require('./config/connectDb');
 const configMiddlewares = require('./config/configMiddlewares');
-
+const routes = require('./config/routes');
+// const connectRedis = require('./config/connectRedis');
 
 const app = express();
 app.use(cookieParser());
