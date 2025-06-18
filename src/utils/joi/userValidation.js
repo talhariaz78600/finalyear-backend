@@ -5,7 +5,7 @@ const base = {
   firstName: Joi.string().trim().max(50),
   lastName: Joi.string().trim().max(50),
   email: Joi.string().email().trim(),
-  contact: Joi.string().pattern(/^\+?[1-9]\d{7,14}$/),
+  contact: Joi.string(),
   password: Joi.string().min(6),
   role: Joi.string().valid(...Object.values(roles)),
   status: Joi.string().valid('Active', 'Inactive', 'Suspend', 'Delete')

@@ -15,4 +15,4 @@ const clientSchema = new Schema({
   notes: { type: String }, // Optional notes from the org/admin about this client
 });
 
-module.exports = User.discriminator('Client', clientSchema);
+module.exports = User.discriminator('client', clientSchema);

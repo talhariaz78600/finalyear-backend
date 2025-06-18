@@ -18,8 +18,15 @@ const sendEmail = async (subject, email, text, data) => {
     return next(new AppError(`Role must be one of: ${Object.values(roles).join(', ')}`, 400));
   }
 
-  const { error } = userCreateSchema.validate(req.body);
-  if (error) return next(new AppError(joiError(error), 400));
+  const { error } = userCreateSchema.validate(req.body,{
+    abortEarly: false, // Collect all errors
+    allowUnknown: true // Allow additional fields not in schema
+  });
+
+  if (error){
+    const fieldErrors = joiError(error);
+    return next(new AppError("Invalid user data", 400,{ fieldErrors }));
+  }
 
   const existing = await User.findOne({ email: req.body.email });
   if (existing) return next(new AppError('Email already registered.', 400));
