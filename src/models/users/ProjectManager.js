@@ -8,4 +8,4 @@ const projectManagerSchema = new Schema({
   experienceYears: { type: Number }, // optional field
 });
 
-module.exports = User.discriminator('ProjectManager', projectManagerSchema);
+module.exports = User.discriminator('projectManager', projectManagerSchema);

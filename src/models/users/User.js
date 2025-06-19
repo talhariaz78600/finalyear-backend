@@ -35,19 +35,7 @@ const userSchema = new Schema(
     },
     contact: {
       type: String,
-      trim: true,
-      validate: {
-        validator(value) {
-          if (!value) return true;
-          try {
-            const number = phoneUtil.parseAndKeepRawInput(value);
-            return phoneUtil.isValidNumber(number);
-          } catch (error) {
-            return false;
-          }
-        },
-        message: 'Invalid phone number for the specified country'
-      }
+      trim: true
     },
     password: {
       type: String,

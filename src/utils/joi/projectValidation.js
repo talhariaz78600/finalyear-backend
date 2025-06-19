@@ -7,6 +7,8 @@ const projectSchema = Joi.object({
   clientId: Joi.string().hex().length(24),
   managerId: Joi.string().hex().length(24),
   tasks: Joi.array().items(Joi.string().hex().length(24)).default([]),
+  deadline: Joi.date(),
+  docs: Joi.string().uri().trim(),
 })
 // .fork(['title', 'description', 'status', 'clientId', 'managerId'], schema => schema.required());
 

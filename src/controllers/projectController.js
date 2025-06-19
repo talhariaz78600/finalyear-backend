@@ -10,7 +10,7 @@ const Task = require('../models/Task');
 const createProject = catchAsync(async (req, res, next) => {
   // Require core project fields dynamically
   const schema = projectSchema.fork(
-    ['title', 'description', 'status', 'clientId', 'managerId'], 
+    ['title', 'description', 'clientId', 'managerId', 'deadline'],
     s => s.required()
   );
   const { error } = schema.validate(req.body);

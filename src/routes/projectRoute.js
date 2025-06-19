@@ -20,9 +20,9 @@ const router = express.Router();
 
 router.use(requireAuth);
 
-router.post('/', restrictTo(roles.ADMIN, roles.MANAGER, roles.SUBADMIN), createProject);
+router.post('/', restrictTo(roles.ADMIN, roles.MANAGER), createProject);
 
-router.patch('/:id', restrictTo(roles.ADMIN, roles.MANAGER, roles.SUBADMIN), updateProject);
+router.patch('/:id', restrictTo(roles.ADMIN, roles.MANAGER), updateProject);
 
 router.delete('/:id', restrictTo(roles.ADMIN), deleteProject);
 

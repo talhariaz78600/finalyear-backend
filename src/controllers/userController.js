@@ -133,4 +133,13 @@ const getDashboardStats = catchAsync(async (req, res) => {
   res.status(200).json({ status: 'success', data: stats });
 });
 
-module.exports = { getUser, getUsers, updateUser, deleteUser, updateStatus, getDashboardStats,createUser };
+const getUsersName = catchAsync(async (req, res) => {
+  const { role = 'client' } = req.query;
+  const match = {};
+  if (role && Object.values(roles).includes(role)) match.role = role;
+
+  const users = await User.find(match).select('firstName lastName');
+  res.status(200).json({ status: 'success', data: users });
+});
+
+module.exports = { getUser, getUsers, updateUser, deleteUser, updateStatus, getDashboardStats,createUser,getUsersName };

@@ -10,12 +10,13 @@ const projectSchema = new Schema({
     enum: ['Pending', 'Ongoing', 'Completed', 'On Hold'],
     default: 'Pending',
   },
-  startDate: { type: Date },
-  endDate: { type: Date },
-
+  deadline: { type: Date },
+  docs: {
+    type: String, // URL or path to project documents
+    trim: true,
+  },
   clientId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   managerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  developers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   tasks: [{ type: Schema.Types.ObjectId, ref: 'Task' }],
   progress: { type: Number, default: 0 }, // 0 to 100
 
