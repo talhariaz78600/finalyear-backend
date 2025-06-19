@@ -55,7 +55,7 @@ const getAllProjects = catchAsync(async (req, res) => {
       .sort(sortOptions)
       .skip(skip)
       .limit(Number(limit))
-      .populate('clientId managerId developers'),
+      .populate('clientId managerId'),
     Project.countDocuments(query)
   ]);
 
@@ -138,15 +138,13 @@ const getProjectAnalytics = catchAsync(async (req, res, next) => {
   });
 });
 
-// Get all projects assigned to a developer
-const getDeveloperProjects = catchAsync(async (req, res, next) => {
-  const devId = req.params.developerId || req.user._id;
+// Get all projects assigned to a manager
+const getManagerProjects = catchAsync(async (req, res, next) => {
+  const devId = req.user._id;
   if (!mongoose.Types.ObjectId.isValid(devId)) return next(new AppError('Invalid developer ID', 400));
 
-  const projects = await Project.find({ developers: devId })
-    .populate('clientId managerId')
-    .populate('tasks');
-
+  const projects = await Project.find({ managerId: devId })
+    .populate('clientId')
   return res.status(200).json({
     status: 'success',
     results: projects.length,
@@ -154,27 +152,6 @@ const getDeveloperProjects = catchAsync(async (req, res, next) => {
   });
 });
 
-const assignDeveloperToProject = catchAsync(async (req, res, next) => {
-  const { projectId, developerId } = req.body;
-
-  if (!mongoose.Types.ObjectId.isValid(projectId) || !mongoose.Types.ObjectId.isValid(developerId)) {
-    return next(new AppError('Invalid project or developer ID format.', 400));
-  }
-
-  const project = await Project.findById(projectId);
-  if (!project) return next(new AppError('Project not found.', 404));
-
-  if (!project.developers.includes(developerId)) {
-    project.developers.push(developerId);
-    await project.save();
-  }
-
-  return res.status(200).json({
-    status: 'success',
-    message: 'Developer assigned to project successfully',
-    data: project
-  });
-});
 
 const updateProjectStatus = catchAsync(async (req, res, next) => {
   const { id } = req.params;
@@ -195,10 +172,9 @@ const updateProjectStatus = catchAsync(async (req, res, next) => {
 });
 
 
-module.exports={
+module.exports = {
   updateProjectStatus,
-  assignDeveloperToProject,
-  getDeveloperProjects,
+  getManagerProjects,
   getProjectAnalytics,
   deleteProject,
   assignTasks,

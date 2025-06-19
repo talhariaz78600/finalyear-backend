@@ -17,7 +17,6 @@ const projectSchema = new Schema({
   },
   clientId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   managerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  tasks: [{ type: Schema.Types.ObjectId, ref: 'Task' }],
   progress: { type: Number, default: 0 }, // 0 to 100
 
   createdAt: { type: Date, default: Date.now },

@@ -3,8 +3,7 @@ const requireAuth = require('../middlewares/requireAuth');
 const restrictTo = require('../middlewares/restrictTo');
 const {
   updateProjectStatus,
-  assignDeveloperToProject,
-  getDeveloperProjects,
+  getManagerProjects,
   getProjectAnalytics,
   deleteProject,
   assignTasks,
@@ -20,24 +19,22 @@ const router = express.Router();
 
 router.use(requireAuth);
 
-router.post('/', restrictTo(roles.ADMIN, roles.MANAGER), createProject);
+router.post('/', restrictTo(roles.ADMIN), createProject);
 
-router.patch('/:id', restrictTo(roles.ADMIN, roles.MANAGER), updateProject);
+router.patch('/:id', restrictTo(roles.ADMIN), updateProject);
 
 router.delete('/:id', restrictTo(roles.ADMIN), deleteProject);
 
-router.patch('/:id/assign-developer', restrictTo(roles.ADMIN, roles.MANAGER), assignDeveloperToProject);
-
-router.patch('/:id/assign-tasks', restrictTo(roles.ADMIN, roles.MANAGER), assignTasks);
+router.patch('/:id/assign-tasks', restrictTo(roles.ADMIN), assignTasks);
 
 router.patch('/:id/status', restrictTo(roles.ADMIN, roles.MANAGER), updateProjectStatus);
 
-router.get('/', restrictTo(roles.ADMIN, roles.MANAGER, roles.SUBADMIN), getAllProjects);
+router.get('/', restrictTo(roles.ADMIN), getAllProjects);
 
 router.get('/:id', getProject);
 
 router.get('/analytics/data', restrictTo(roles.ADMIN), getProjectAnalytics);
 
-router.get('/developer/my-projects', restrictTo(roles.DEVELOPER), getDeveloperProjects);
+router.get('/manager/my-projects', restrictTo(roles.MANAGER), getManagerProjects);
 
 module.exports = router;
