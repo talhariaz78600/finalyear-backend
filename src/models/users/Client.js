@@ -7,11 +7,6 @@ const clientSchema = new Schema({
   address: { type: String },
   projects: [{ type: Schema.Types.ObjectId, ref: 'Project' }],
   joinedDate: { type: Date, default: Date.now },
-  status: {
-    type: String,
-    enum: ['active', 'inactive', 'pending'],
-    default: 'active',
-  },
   notes: { type: String }, // Optional notes from the org/admin about this client
 });
 

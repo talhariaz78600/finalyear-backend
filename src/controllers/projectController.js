@@ -88,7 +88,7 @@ const deleteProject = catchAsync(async (req, res, next) => {
   const deleted = await Project.findByIdAndDelete(id);
   if (!deleted) return next(new AppError('Project not found', 404));
 
-  return res.status(204).json({ status: 'success', message: 'Project deleted successfully', data: null });
+  return res.status(200).json({ status: 'success', message: 'Project deleted successfully', data: null });
 });
 
 // Assign tasks to developers within a project
