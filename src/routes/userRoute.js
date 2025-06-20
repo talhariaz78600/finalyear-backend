@@ -1,12 +1,14 @@
 const express = require('express');
 const requireAuth = require('../middlewares/requireAuth');
-const { getUser, getUsers, updateUser, deleteUser, updateStatus, getDashboardStats, createUser,getUsersName } = require('../controllers/userController');
+const { getUser, getUsers, updateUser, deleteUser, updateStatus, getDashboardStats, createUser, getUsersName, getMe, updateMe } = require('../controllers/userController');
 
 const restrictTo = require('../middlewares/restrictTo');
 const { roles } = require('../utils/types');
 const router = express.Router();
 router.use(requireAuth);
 
+router.get('/me', getMe);
+router.patch('/me', updateMe);
 
 router.get('/stats', restrictTo(roles.ADMIN), getDashboardStats);
 

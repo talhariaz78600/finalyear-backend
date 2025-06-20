@@ -6,26 +6,27 @@ const joiError = require('../utils/joiError');
 const { userCreateSchema, userUpdateSchema } = require('../utils/joi/userValidation');
 const { roles } = require('../utils/types');
 const Email = require('../utils/email');
+const Project = require('../models/Project');
 
 const sendEmail = async (subject, email, text, data) => {
   await new Email(email, subject).sendTextEmail(subject, text, data);
 };
 
 // Create User (Admin only: client, developer, manager, subadmin)
- const createUser = catchAsync(async (req, res, next) => {
+const createUser = catchAsync(async (req, res, next) => {
   const { role } = req.body;
   if (!Object.values(roles).includes(role)) {
     return next(new AppError(`Role must be one of: ${Object.values(roles).join(', ')}`, 400));
   }
 
-  const { error } = userCreateSchema.validate(req.body,{
+  const { error } = userCreateSchema.validate(req.body, {
     abortEarly: false, // Collect all errors
     allowUnknown: true // Allow additional fields not in schema
   });
 
-  if (error){
+  if (error) {
     const fieldErrors = joiError(error);
-    return next(new AppError("Invalid user data", 400,{ fieldErrors }));
+    return next(new AppError("Invalid user data", 400, { fieldErrors }));
   }
 
   const existing = await User.findOne({ email: req.body.email });
@@ -39,6 +40,15 @@ const sendEmail = async (subject, email, text, data) => {
 const getUser = catchAsync(async (req, res, next) => {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) return next(new AppError('Invalid ID', 400));
+
+  const user = await User.findById(id).select('-password');
+  if (!user) return next(new AppError('User not found', 404));
+
+  return res.status(200).json({ status: 'success', data: user });
+});
+const getMe = catchAsync(async (req, res, next) => {
+  const { id } = req.user;
+
 
   const user = await User.findById(id).select('-password');
   if (!user) return next(new AppError('User not found', 404));
@@ -90,6 +100,25 @@ const updateUser = catchAsync(async (req, res, next) => {
 
   res.status(200).json({ status: 'success', data: user });
 });
+// Update  (all roles)
+const updateMe = catchAsync(async (req, res, next) => {
+  const id = req.user.id;
+  console.log('Updating user:', req.body);
+  const { error } = userUpdateSchema.validate(req.body,{
+    abortEarly: false, // Collect all errors
+    allowUnknown: true // Allow additional fields not in schema
+  });
+  if (error) {
+    return next(new AppError("Invalid user data", 400, { fieldErrors: joiError(error) }));
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(id)) return next(new AppError('Invalid ID', 400));
+
+  const user = await User.findByIdAndUpdate(id, req.body, { new: true, runValidators: true }).select('-password');
+  if (!user) return next(new AppError('User not found', 404));
+
+  res.status(200).json({ status: 'success', data: user });
+});
 
 // Delete (soft)
 const deleteUser = catchAsync(async (req, res, next) => {
@@ -130,7 +159,26 @@ const getDashboardStats = catchAsync(async (req, res) => {
     { $project: { role: '$_id', count: 1, _id: 0 } }
   ];
   const stats = await User.aggregate(pipeline);
-  res.status(200).json({ status: 'success', data: stats });
+  // Project stats by status
+  const projectstats = await Project.aggregate([
+    {
+      $group: {
+        _id: '$status',
+        count: { $sum: 1 }
+      }
+    },
+    {
+      $project: {
+        status: '$_id',
+        count: 1,
+        _id: 0
+      }
+    }
+  ]);
+
+  
+
+  res.status(200).json({ status: 'success', data: stats, projectstats });
 });
 
 const getUsersName = catchAsync(async (req, res) => {
@@ -142,4 +190,4 @@ const getUsersName = catchAsync(async (req, res) => {
   res.status(200).json({ status: 'success', data: users });
 });
 
-module.exports = { getUser, getUsers, updateUser, deleteUser, updateStatus, getDashboardStats,createUser,getUsersName };
+module.exports = { getMe, getUser, getUsers, updateUser, deleteUser, updateStatus, getDashboardStats, createUser, getUsersName, updateMe };
