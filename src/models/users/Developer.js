@@ -13,4 +13,4 @@ const developerSchema = new Schema({
   },
 });
 
-module.exports = User.discriminator('Developer', developerSchema);
+module.exports = User.discriminator('developer', developerSchema);
