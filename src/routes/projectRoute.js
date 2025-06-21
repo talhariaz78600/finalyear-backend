@@ -25,9 +25,9 @@ router.patch('/:id', restrictTo(roles.ADMIN), updateProject);
 
 router.delete('/:id', restrictTo(roles.ADMIN), deleteProject);
 
-router.patch('/:id/assign-tasks', restrictTo(roles.ADMIN), assignTasks);
+router.patch('/task/:id/assign-tasks', restrictTo(roles.ADMIN), assignTasks);
 
-router.patch('/:id/status', restrictTo(roles.ADMIN, roles.MANAGER), updateProjectStatus);
+router.patch('/:id/status', restrictTo([roles.ADMIN, roles.PROJECT_MANAGER]), updateProjectStatus);
 
 router.get('/', restrictTo(roles.ADMIN), getAllProjects);
 
@@ -35,6 +35,6 @@ router.get('/:id', getProject);
 
 router.get('/analytics/data', restrictTo(roles.ADMIN), getProjectAnalytics);
 
-router.get('/manager/my-projects', restrictTo(roles.MANAGER), getManagerProjects);
+router.get('/manager/my-projects', restrictTo(roles.PROJECT_MANAGER), getManagerProjects);
 
 module.exports = router;

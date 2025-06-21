@@ -141,10 +141,28 @@ const getProjectAnalytics = catchAsync(async (req, res, next) => {
 // Get all projects assigned to a manager
 const getManagerProjects = catchAsync(async (req, res, next) => {
   const devId = req.user._id;
+  const { status = 'Pending' } = req.query;
+
   if (!mongoose.Types.ObjectId.isValid(devId)) return next(new AppError('Invalid developer ID', 400));
 
-  const projects = await Project.find({ managerId: devId })
-    .populate('clientId')
+  const projects = await Project.aggregate([
+    {
+      $match: {
+        managerId: new mongoose.Types.ObjectId(devId),
+        status: status
+      }
+    },
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'clientId',
+        foreignField: '_id',
+        as: 'client'
+      }
+    },
+    { $unwind: { path: '$client', preserveNullAndEmptyArrays: true } }
+  ]);
+
   return res.status(200).json({
     status: 'success',
     results: projects.length,
@@ -157,7 +175,7 @@ const updateProjectStatus = catchAsync(async (req, res, next) => {
   const { id } = req.params;
   const { status } = req.body;
 
-  if (!['ongoing', 'pending', 'completed'].includes(status)) {
+  if (!['Pending', 'Ongoing', 'Completed', 'On Hold'].includes(status)) {
     return next(new AppError('Invalid project status.', 400));
   }
 
