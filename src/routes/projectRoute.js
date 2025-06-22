@@ -10,7 +10,8 @@ const {
   getProject,
   getAllProjects,
   updateProject,
-  createProject
+  createProject,
+  getClientProjects
 } = require('../controllers/projectController');
 
 const { roles } = require('../utils/types');
@@ -29,12 +30,14 @@ router.patch('/task/:id/assign-tasks', restrictTo(roles.ADMIN), assignTasks);
 
 router.patch('/:id/status', restrictTo([roles.ADMIN, roles.PROJECT_MANAGER]), updateProjectStatus);
 
-router.get('/', restrictTo(roles.ADMIN), getAllProjects);
+router.get('/', restrictTo([roles.ADMIN]), getAllProjects);
 
 router.get('/:id', getProject);
 
-router.get('/analytics/data', restrictTo(roles.ADMIN), getProjectAnalytics);
+router.get('/analytics/data', restrictTo([roles.ADMIN]), getProjectAnalytics);
 
-router.get('/manager/my-projects', restrictTo(roles.PROJECT_MANAGER), getManagerProjects);
+router.get('/manager/my-projects', restrictTo([roles.PROJECT_MANAGER]), getManagerProjects);
+
+router.get('/client/my-projects', restrictTo([roles.CLIENT]), getClientProjects);
 
 module.exports = router;

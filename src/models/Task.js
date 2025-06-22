@@ -14,14 +14,6 @@ const taskSchema = new Schema({
   projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true },
   assignedTo: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   deadline: { type: Date },
-  attachments: [{ type: String }], // file URLs
-  comments: [
-    {
-      comment: String,
-      author: { type: Schema.Types.ObjectId, ref: 'User' },
-      timestamp: { type: Date, default: Date.now },
-    }
-  ],
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date },
 });

@@ -104,7 +104,7 @@ const updateUser = catchAsync(async (req, res, next) => {
 const updateMe = catchAsync(async (req, res, next) => {
   const id = req.user.id;
   console.log('Updating user:', req.body);
-  const { error } = userUpdateSchema.validate(req.body,{
+  const { error } = userUpdateSchema.validate(req.body, {
     abortEarly: false, // Collect all errors
     allowUnknown: true // Allow additional fields not in schema
   });
@@ -153,32 +153,90 @@ const updateStatus = catchAsync(async (req, res, next) => {
 
 // Admin Dashboard stats (aggregation)
 const getDashboardStats = catchAsync(async (req, res) => {
-  const pipeline = [
-    { $match: {} },
+  // User stats by role
+  const userStats = await User.aggregate([
     { $group: { _id: '$role', count: { $sum: 1 } } },
     { $project: { role: '$_id', count: 1, _id: 0 } }
-  ];
-  const stats = await User.aggregate(pipeline);
+  ]);
+
   // Project stats by status
-  const projectstats = await Project.aggregate([
+  const projectStats = await Project.aggregate([
+    { $group: { _id: '$status', count: { $sum: 1 } } },
+    { $project: { status: '$_id', count: 1, _id: 0 } }
+  ]);
+
+  // Last 4 projects (most recent)
+  const lastProjects = await Project.aggregate([
+       {
+      $lookup: {
+        from: 'users',
+        localField: 'clientId',
+        foreignField: '_id',
+        as: 'clientId'
+      }
+    },
+    { $unwind: { path: '$clientId', preserveNullAndEmptyArrays: true } },
     {
-      $group: {
-        _id: '$status',
-        count: { $sum: 1 }
+      $lookup: {
+        from: 'users',
+        localField: 'managerId',
+        foreignField: '_id',
+        as: 'managerId'
+      }
+    },
+    { $unwind: { path: '$managerId', preserveNullAndEmptyArrays: true } },
+        {
+      $lookup: {
+        from: 'tasks',
+        localField: '_id',
+        foreignField: 'projectId',
+        as: 'tasks'
       }
     },
     {
-      $project: {
-        status: '$_id',
-        count: 1,
-        _id: 0
+      $addFields: {
+        totalTasks: { $size: '$tasks' },
+        completedTasks: {
+          $size: {
+            $filter: {
+              input: '$tasks',
+              as: 'task',
+              cond: { $eq: ['$$task.status', 'Completed'] }
+            }
+          }
+        },
+
       }
-    }
+    },
+    {
+      $addFields: {
+        progress: {
+          $cond: [
+            { $eq: ['$totalTasks', 0] },
+            0,
+            { $multiply: [
+                { $divide: ['$completedTasks', '$totalTasks'] },
+                100
+              ]
+            }
+          ]
+        }
+      }
+    },
+    { $sort: { createdAt: -1 } },
+    { $limit: 4 },
+    { $project: { __v: 0, tasks: 0 } }
   ]);
 
-  
 
-  res.status(200).json({ status: 'success', data: stats, projectstats });
+  res.status(200).json({
+    status: 'success',
+    data: {
+      userStats,
+      projectStats,
+      lastProjects
+    }
+  });
 });
 
 const getUsersName = catchAsync(async (req, res) => {

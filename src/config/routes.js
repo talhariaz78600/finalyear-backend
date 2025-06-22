@@ -3,7 +3,8 @@ const {
   authRoute,
   userRoute,
   projectRoute,
-  logsRoute
+  logsRoute,
+  taskRoute
 } = require('../routes');
 
 const otherRoutes = require('./otherRoutes');
@@ -16,6 +17,7 @@ module.exports = (app) => {
   app.use('/api/user', userRoute);
   app.use('/api/project', projectRoute);
   app.use('/api/logs', logsRoute);
+  app.use('/api/task', taskRoute);
   app.get('/', (req, res) => {
     res.send('OK');
   });
