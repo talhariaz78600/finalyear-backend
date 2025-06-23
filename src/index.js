@@ -28,6 +28,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // Load all routes
+app.set('trust proxy', 1);
 setupRoutes(app);
 
 // Connect DB and then start the server
