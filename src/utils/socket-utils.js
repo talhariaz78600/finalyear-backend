@@ -10,18 +10,20 @@ const Reactions = require('../models/chat/Reaction');
 
 const defaultImage = 'https://randomuser.me/api/portraits/men/14.jpg'
 const { ObjectId } = require("mongoose").Types
-// const { getMessaging } = require("firebase-admin/messaging");
 const User = require('../models/users/User');
-const Bookings = require('../models/Bookings');
 const Notification = require('../models/Notification');
 
 module.exports = {
 
     authMiddleWareSocket: async (socket, next) => {
         try {
-            const authorization = socket.handshake.auth.token;
+                        // For Postman or socket.io clients that send token in headers
+            const authorization = socket.handshake.headers.token || socket.handshake.auth.token;
+            // console.log("authorization", socket.handshake.headers)
+
+            
             if (!authorization) {
-                return next(new Error("You must be logged in"));
+                return next(new Error("You must be logged in"));                                                                                                                    
             }
             console.log("authorization", authorization)
             if (!authorization) {
@@ -32,16 +34,11 @@ module.exports = {
             if (!currentUser) {
                 return next(new Error("Invalid token."));
             }
+
             const user = await User.findById(currentUser._id)
-            console.log(user.fullName); // Should log "First Last"
+           
             if (!user) {
                 return next(new Error("User not found."));
-            }
-            if (user?.role === "admin") {
-                const adminUser = await User.findOne({ adminRole: 'admin' });
-                socket.user = adminUser;
-                socket.subAdmin = user;
-
             }
 
             socket.user = user;
@@ -385,16 +382,15 @@ module.exports = {
     fetchUserChats: async (params) => {
         try {
             console.log(`fetchUserChats util called with params ${JSON.stringify(params)}`);
-            const { userId, pageNo = 1, recordsPerPage = 10, others = false, chatType = "contact" } = params;
+            const { userId, pageNo = 1, recordsPerPage = 10, others = false } = params;
             console.log("others", others)
             console.log("userId", userId)
             let a = JSON.parse(others || false) ? false : true
-            console.log("a", a)
             const skipDocuments = (pageNo - 1) * recordsPerPage;
             const documentsLimit = recordsPerPage;
             const userChatIds = await Chats.find(
                 {
-                    chatType: chatType,
+                    
                     participants: new ObjectId(userId),
                     $or: [
                         { userSettings: { $size: 0 } },
@@ -448,8 +444,7 @@ module.exports = {
                     const messageDeliveryStatus = module.exports.msgDeliveryStatus({ userId, chat }) || {};
                     const chatDisplayInfo = {
                         chatId: chat?._id,
-                        chatType: chat?.chatType,
-                        chatName: chat?.groupName || chat?.participants?.find(participant => participant?._id?.toString?.() !== userId?.toString?.())?.fullName,
+                        chatName: chat?.groupName || chat?.participants?.find(participant => participant?._id?.toString?.() !== userId?.toString?.())?.fullName || chat?.participants?.find(participant => participant?._id?.toString?.() !== userId?.toString?.())?.firstName || chat?.participants?.find(participant => participant?._id?.toString?.() !== userId?.toString?.())?.lastName,
                         displayPicture,
                         latestMessage: chat?.lastMessage?.content,
                         latesMessageId: chat?.lastMessage?._id,
@@ -481,7 +476,7 @@ module.exports = {
 
     fetchChatMessages: async (params) => {
         try {
-            const { chatId, userId, bookingId, pageNo = 1, recordsPerPage = 20 } = params;
+            const { chatId, userId, pageNo = 1, recordsPerPage = 20 } = params;
             const skipDocuments = (pageNo - 1) * recordsPerPage;
             const documentsLimit = recordsPerPage;
             const messagesQuery = {
@@ -490,9 +485,6 @@ module.exports = {
                     { userSettings: { $not: { $elemMatch: { userId, deletedAt: { $exists: true } } } } },
                     { userSettings: { $elemMatch: { userId, deletedAt: null } } }
                 ],
-            }
-            if (bookingId) {
-                messagesQuery.bookingId = bookingId
             }
 
             const totalRecords = await Messages.countDocuments(messagesQuery);
@@ -533,61 +525,6 @@ module.exports = {
                 pageNo: 1,
                 recordsPerPage: 20
             }
-        }
-    },
-    fetchChatBookings: async (params) => {
-        try {
-            const { user, receiverId } = params;
-
-            let customerId;
-            let vendorId;
-            if (user.role === "customer") {
-                customerId = user?._id;
-                vendorId = receiverId;
-            } else {
-                vendorId = user?._id;
-                customerId = receiverId;
-            }
-
-     
-
-            const query = [{
-                $match: {
-                    user: new mongoose.Types.ObjectId(customerId),
-                }
-            }, {
-                $lookup: {
-                    from: 'servicelistings',
-                    localField: 'service',
-                    foreignField: '_id',
-                    as: 'servicedetail'
-                }
-            }, {
-                $unwind: { path: '$servicedetail', preserveNullAndEmptyArrays: true },
-            }, {
-                $match: {
-                    'servicedetail.vendorId': new mongoose.Types.ObjectId(vendorId)
-                }
-            }];
-
-            console.log("query", query);
-
-            const result = await Bookings.aggregate(query);
-            // const bookings = result[0]?.data || [];
-            // console.log(result , "bookings");
-            return {
-
-                bookings:result 
-            };
-        } catch (error) {
-            console.error("Error fetching chat bookings:", error.message);
-            return {
-                // pageNo,
-                // recordsPerPage,
-                totalRecords: 0,
-                totalPages: 0,
-                bookings: []
-            };
         }
     },
 

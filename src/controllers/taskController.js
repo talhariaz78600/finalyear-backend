@@ -59,6 +59,31 @@ const getTasks = catchAsync(async (req, res, next) => {
     data: tasks
   });
 });
+const getDeveloperTasks = catchAsync(async (req, res, next) => {
+  const {   status, search = '', page = 1, limit = 100 } = req.query;
+    const id=req.user._id;
+  const skip = (page - 1) * limit;
+  const filter = { assignedTo: id };
+
+  if (status) filter.status = status;
+  if (search) filter.title = { $regex: search, $options: 'i' };
+
+  const [total, tasks] = await Promise.all([
+    Task.countDocuments(filter),
+    Task.find(filter)
+      .populate('projectId', 'title')
+      .skip(skip)
+      .limit(Number(limit))
+      .sort({ createdAt: -1 })
+  ]);
+
+  res.status(200).json({
+    status: 'success',
+    total,
+    results: tasks.length,
+    data: tasks
+  });
+});
 
 // Get single task
 const getTask = catchAsync(async (req, res, next) => {
@@ -85,6 +110,29 @@ const updateTask = catchAsync(async (req, res, next) => {
   res.status(200).json({ status: 'success', data: task });
 });
 
+const getDeveloperTaskStats = catchAsync(async (req, res, next) => {
+  const developerId = req.user._id;
+
+  const [total, pending, inProgress, completed, onHold] = await Promise.all([
+    Task.countDocuments({ assignedTo: developerId }),
+    Task.countDocuments({ assignedTo: developerId, status: 'Pending' }),
+    Task.countDocuments({ assignedTo: developerId, status: 'In Progress' }),
+    Task.countDocuments({ assignedTo: developerId, status: 'Completed' }),
+    Task.countDocuments({ assignedTo: developerId, status: 'On Hold' }),
+  ]);
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      totalTasks: total,
+      pendingTasks: pending,
+      inProgressTasks: inProgress,
+      completedTasks: completed,
+      onHoldTasks: onHold,
+    }
+  });
+});
+
 // Delete task (Manager only)
 const   deleteTask = catchAsync(async (req, res, next) => {
   const { id } = req.params;
@@ -101,5 +149,7 @@ module.exports = {
   getTasks,
   getTask,
   updateTask,
-  deleteTask
+  deleteTask,
+  getDeveloperTasks,
+  getDeveloperTaskStats
 };

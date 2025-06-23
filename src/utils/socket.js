@@ -2,8 +2,6 @@ const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const { ObjectId } = require("mongoose").Types
 
-const moment = require('moment')
-const UsersModel = require('../models/users/User');
 const MessagesModel = require('../models/chat/Message');
 const ChatsModel = require('../models/chat/Chat');
 const ReactionsModel = require('../models/chat/Reaction');
@@ -19,18 +17,15 @@ const {
     deleteUserChat,
     addReaction,
     fetchChatMessages,
-    fetchChatBookings,
     removeReaction,
     editMessage,
     markMessageAsRead,
-    getUserNotifications,
-    getUserUnreadNotifications,
-    readUserNotifications
 
 
 } = require('./socket-utils');
-const Bookings = require('../models/Bookings');
-const sendNotification = require('./storeNotification');
+const User = require('../models/users/User');
+
+
 
 
 let io;
@@ -50,25 +45,14 @@ function initializeSocket(server) {
     io.on('connection', async (socket) => {
         const socketId = socket.id;
         const userId = socket?.user?._id.toString();
-        const username = socket?.user?.fullName ?? socket?.user?.firstName;
+        const username = socket?.user?.name || "Client"
         const user = socket?.user
-        const subAdmin = socket?.subAdmin?.toObject()
-
-        console.log(subAdmin?.role, subAdmin?.adminRole, "this is sub admin data")
 
         if (userId) {
             socket.join(userId.toString())
             console.log(`User ${userId}  ${username} connected and joined room `);
         }
 
-        if (subAdmin?.adminRole === "subAdmin") {
-
-            socket.join(`notification_subAdmin_${subAdmin?._id}`)
-
-        } else if (subAdmin?.adminRole === "admin") {
-            console.log(subAdmin?.adminRole, "this is sub admin data")
-            socket.join(`notification_admin`)
-        }
         try {
 
 
@@ -83,12 +67,6 @@ function initializeSocket(server) {
                                 $elemMatch: {
                                     userId: userId,
                                     $and: [
-                                        {
-                                            $or: [
-                                                { isDeletedFrom2Reply: false },
-                                                { isDeletedFrom2Reply: { $exists: false } }
-                                            ],
-                                        },
                                         {
                                             $or: [
                                                 { hasUserDeletedChat: false },
@@ -170,7 +148,7 @@ function initializeSocket(server) {
                     socket.emit('user-active-status', { isUserOnline: true });
                     return;
                 }
-                const userToCheckData = await UsersModel.findById(userToCheckId);
+                const userToCheckData = await User.findById(userToCheckId);
                 const lastSeen = userToCheckData?.lastSeen;
                 socket.emit('user-active-status', { isUserOnline: false, lastSeen });
                 return;
@@ -202,44 +180,6 @@ function initializeSocket(server) {
             } catch (error) {
                 console.log(`Got error in fetch-user-chats: ${(JSON.stringify(error?.stack))}`);
                 socket.emit('socket-error', { message: 'Error in fetching unseen chats.' });
-            }
-        });
-
-        socket.on('fetch-chat-booking', async (data) => {
-            try {
-
-                let receiverId = data?.receiverId;
-                if (receiverId && typeof receiverId === 'object' && receiverId._id) {
-                    receiverId = receiverId._id.toString();
-                }
-                if (!receiverId && !data?.chatId) {
-                    console.log(`Receiver id or chat id is required in send-message`);
-                    socket.emit('socket-error', { message: 'Receiver id or chat id is required.' });
-                    return;
-                }
-                if (data?.chatId) {
-                    const validateUserChat = await ChatsModel.findOne({ _id: data?.chatId, participants: new ObjectId(userId) });
-                    console.log(`Got chat validation response in DB [send-message]: ${JSON.stringify(validateUserChat)}`);
-                    if (!validateUserChat) {
-                        // console.log(`No chat found against chat id ${data?.chatId} and user ${userId} in send-message`);
-                        socket.emit('socket-error', { message: 'No chat found against chat id and user.' });
-                        return;
-                    }
-                    if (receiverId && !validateUserChat?.participants?.includes(receiverId)) {
-                        // console.log(`Receiver is not a part of chat ${data?.chatId} in send-message`);
-                        socket.emit('socket-error', { message: `You can't send message to user who is not part of chat.` });
-                        return;
-                    } else {
-                        receiverId = validateUserChat?.participants?.find(participant => participant.toString?.() !== userId?.toString());
-                    }
-                }
-                console.log(`fetch-chats event received for socket ${socketId} and user ${userId} with data: ${JSON.stringify(data)}`);
-                const bookings = await fetchChatBookings({ ...data, receiverId, user: socket?.user });
-                console.log(`Found  user chats in [fetch-chat-booking] for user ${userId}`);
-                socket.emit('user-booking', bookings);
-            } catch (error) {
-                console.log(`Got error in fetch-chat-bookings: ${(JSON.stringify(error?.stack))}`);
-                socket.emit('socket-error', { message: 'Error in fetching chat booking' });
             }
         });
 
@@ -303,36 +243,12 @@ function initializeSocket(server) {
             try {
 
                 let receiverId = data?.receiverId;
-                const senderData = user ////////////////////// this is required for process /////////////////////////
-
-
-                if (!data?.chatType) {
-                    socket.emit('socket-error', { message: 'chatType is required.' });
-                    return;
-                }
-                let bookingId = data?.bookingId;
-                if (data?.chatType === 'service') {
-                    if (!bookingId) {
-                        socket.emit('socket-error', { message: 'Booking id is required.' });
-                        return
-                    }
-                }
-                if (bookingId) {
-                    const findBooking = await Bookings.findById(bookingId);
-                    if (!findBooking) {
-                        socket.emit('socket-error', { message: `Booking not found with id ${bookingId._id}` });
-                        return
-                    }
-                    bookingId = findBooking._id.toString();
-                }
+                const senderData = user 
 
                 if (receiverId && typeof receiverId === 'object' && receiverId._id) {
                     receiverId = receiverId._id.toString();
                 }
-                if (!receiverId && !data?.chatId && data?.chatType !== 'contact') {
-                    socket.emit('socket-error', { message: 'Receiver id or chat id is required.' });
-                    return;
-                }
+
 
                 if (data?.chatId) {
                     const validateUserChat = await ChatsModel.findOne({ _id: data?.chatId, participants: new ObjectId(userId) });
@@ -350,18 +266,14 @@ function initializeSocket(server) {
                     }
                 }
                 let receiverData;
-                if (!receiverId && data?.chatType !== "contact") {
-                    socket.emit('socket-error', { message: `Failed to retreive receiver data.` });
-                    return;
-                }
 
-                console.log(`Receiver id is ${receiverId}`, "this is receiver id ..........................................................");
 
-                if (data?.chatType === "contact" && !receiverId) {
-                    receiverData = await UsersModel.findOne({ adminRole: "admin" });
+
+                if (!receiverId) {
+                    receiverData = await User.findOne({ role: "admin" });
                     receiverId = receiverData?._id.toString();
                 } else {
-                    receiverData = await UsersModel.findById(receiverId.toString());
+                    receiverData = await User.findById(receiverId.toString());
                 }
 
                 if (!receiverData) {
@@ -382,24 +294,16 @@ function initializeSocket(server) {
                         return
                     } else {
                         chat = await ChatsModel.findOne({
-                            chatType: data?.chatType,
                             participants: { $all: [userId, receiverId], $size: 2 }
                         });
 
                     }
-
+                                                            
                     if (!chat) {
                         console.log("No existing chat found. Creating a new one...");
+                                                                                                                    
+                        chat = await ChatsModel.create({ participants: [userId, receiverId] });
 
-                        chat = await ChatsModel.create({ participants: [userId, receiverId], chatType: data?.chatType });
-                     sendNotification({
-                            userId: receiverId,
-                            title: 'New Message',
-                            message: `${senderData?.fullName} has sent you a message.`,
-                            type: 'message',
-                            fortype: "customer_support",
-                            permission: 'help'
-                        });
                     }
 
                     console.log("Chat found or created:", chat);
@@ -449,7 +353,7 @@ function initializeSocket(server) {
                     contentType: data?.contentType,
                     contentDescriptionType: data?.contentDescriptionType,
                     userSettings: userSettingsBody,
-                    bookingId: bookingId
+              
                 }
                 const addMessage = await MessagesModel.create(messageBody);
 
@@ -591,36 +495,37 @@ function initializeSocket(server) {
             try {
 
                 let receiverId = data?.receiverId;
-
-                if (!data?.chatType) {
-                    socket.emit('socket-error', { message: 'chatType is required.' });
-                    return;
-                }
-
-
-
+                const senderData = user 
 
                 if (receiverId && typeof receiverId === 'object' && receiverId._id) {
                     receiverId = receiverId._id.toString();
                 }
-                if (!receiverId && data?.chatType !== 'contact') {
-                    socket.emit('socket-error', { message: 'Receiver id or chat id is required.' });
-                    return;
+
+
+                if (data?.chatId) {
+                    const validateUserChat = await ChatsModel.findOne({ _id: data?.chatId, participants: new ObjectId(userId) });
+                    console.log(`Got chat validation response in DB [send-message]: ${JSON.stringify(validateUserChat)}`);
+                    if (!validateUserChat) {
+                        socket.emit('socket-error', { message: 'No chat found against chat id and user.' });
+                        return;
+                    }
+                    if (receiverId && !validateUserChat?.participants?.includes(receiverId)) {
+                        socket.emit('socket-error', { message: `You can't send message to user who is not part of chat.` });
+                        return;
+                    } else {
+                        receiverId = validateUserChat?.participants?.find(participant => participant.toString?.() !== userId?.toString());
+                        console.log(`Receiver id is ${receiverId}`, "this is receiver id ..........................................................");
+                    }
                 }
-
-
                 let receiverData;
-                if (!receiverId && data?.chatType !== "contact") {
-                    socket.emit('socket-error', { message: `Failed to retreive receiver data.` });
-                    return;
-                }
 
 
-                if (data?.chatType === "contact" && !receiverId) {
-                    receiverData = await UsersModel.findOne({ adminRole: "admin" });
+
+                if (!receiverId) {
+                    receiverData = await User.findOne({ role: "admin" });
                     receiverId = receiverData?._id.toString();
                 } else {
-                    receiverData = await UsersModel.findById(receiverId.toString());
+                    receiverData = await User.findById(receiverId.toString());
                 }
 
                 if (!receiverData) {
@@ -641,15 +546,16 @@ function initializeSocket(server) {
                         return
                     } else {
                         chat = await ChatsModel.findOne({
-                            chatType: data?.chatType,
                             participants: { $all: [userId, receiverId], $size: 2 }
                         });
-                    }
 
+                    }
+                                                            
                     if (!chat) {
                         console.log("No existing chat found. Creating a new one...");
+                                                                                                                    
+                        chat = await ChatsModel.create({ participants: [userId, receiverId] });
 
-                        chat = await ChatsModel.create({ participants: [userId, receiverId], chatType: data?.chatType });
                     }
 
                     console.log("Chat found or created:", chat);
@@ -689,41 +595,22 @@ function initializeSocket(server) {
                     });
                 }
 
-                const latestMessageData = await Messages.findOne({ chat: chatId });
 
-
-
-                const unreadCount = await Messages.countDocuments({
-                    chat: { $in: chatId },
-                    $or: [
-                        { userSettings: { $size: 0 } },
-                        { 'userSettings.userId': { $ne: receiverId } },
-                        {
-                            userSettings: {
-                                $elemMatch: {
-                                    userId: receiverId,
-                                    $or: [{ readAt: null }, { readAt: { $exists: false } }]
-                                }
-                            }
-                        }
-                    ]
-                });
-                console.log("unreadCount", unreadCount);
-
+         
                 const messageEmitBody = {
                     chatScreenBody: {
                         chatId,
                         chatName,
                         chatType: chatDetails?.chatType,
                         receiverId,
-                        latestMessage: latestMessageData?.content ?? '',
-                        latesMessageId: latestMessageData?._id,
-                        latestMessageType: latestMessageData?.contentType ?? 'text',
-                        contentDescriptionType: latestMessageData?.contentDescriptionType ?? 'text',
-                        latestMessageSentAt: latestMessageData?.createdAt,
-                        latestMessageTitle: latestMessageData?.contentTitle ?? '',
-                        fileSize: latestMessageData?.fileSize ?? '',
-                        latestMessageDescription: latestMessageData?.contentDescription ?? '',
+                        latestMessage:  '',
+                        latesMessageId: null,
+                        latestMessageType:  'text',
+                        contentDescriptionType: 'text',
+                        latestMessageSentAt: null,
+                        latestMessageTitle:  '',
+                        fileSize:  '',
+                        latestMessageDescription:  '',
                         unreadCount: unreadCount,
 
                     }
@@ -739,7 +626,7 @@ function initializeSocket(server) {
                 };
 
                 const messageDeliveryStatus = msgDeliveryStatus({ userId, chat: { lastMessage: latestMessageData } }) || {};
-                io.to(userId.toString()).emit('get-single-chat', {
+                io.to(userId.toString()).emit('receive-message', {
                     ...messageEmitBody,
                     chatScreenBody: {
                         ...messageEmitBody.chatScreenBody,
@@ -753,6 +640,23 @@ function initializeSocket(server) {
                     }
                 });
 
+                if (receiverId.toString() !== userId.toString()) {
+                    if (receiverSocketId) {
+                        io.to(receiverId.toString()).emit('receive-message', {
+                            ...messageEmitBody,
+                            chatScreenBody: {
+                                ...messageEmitBody.chatScreenBody,
+                                chatName: chatNameForUser(chatDetails, receiverId),
+                                displayPicture: chatProfileForUser(chatDetails, receiverId),
+                            },
+                        });
+                        io.to(userId?.toString?.()).emit('mark-message-deliver-response', { success: true, chatId, allMsgsDelivered: true });
+                    }
+                }
+
+  
+
+                chatDetails.markModified('userSettings');
 
             } catch (error) {
                 console.log(error)
@@ -948,7 +852,7 @@ function initializeSocket(server) {
                     return chatDetails?.participants?.find(participant => participant?._id?.toString?.() != userId?.toString?.())?.profilePicture ?? chatDetails?.participants?.find(participant => participant?._id?.toString?.() != userId?.toString?.())?.profilePicture ?? defaultImage;
                 };
                 const otherUser = chat?.participants?.find(participant => participant._id.toString() !== userId.toString());
-                const senderData = await UsersModel.findById(userId);
+                const senderData = await User.findById(userId);
 
                 const displayPicture = chat?.participants?.find(participant => participant?._id?.toString?.() != userId?.toString?.())?.profilePicture ?? chat?.participants?.find(participant => participant?._id?.toString?.() != userId?.toString?.())?.profilePicture ?? defaultImage;
                 const messageEmitBody = {
@@ -1000,7 +904,7 @@ function initializeSocket(server) {
                 const receiverId = chat?.participants?.find(participant => participant?._id?.toString?.() !== userId?.toString?.())?._id;
                 console.log(`Receiver id found in edit-message: ${receiverId}`);
                 if (receiverId) {
-                    // const receiverUserData = await UsersModel.findById(receiverId);
+                    // const receiverUserData = await User.findById(receiverId);
                     // const receiverSocketId = receiverUserData?.active_socket;
                     console.log(`Emitting edit-message-response to receiver ${receiverId} with socket id ${receiverId}`);
                     io.to(receiverId.toString()).emit('edit-message-response', {
@@ -1047,46 +951,7 @@ function initializeSocket(server) {
         });
 
 
-        socket.on('get-user-notifications', async (data) => {
-            try {
-                console.log(`get-user-notifications event received for socket ${socketId} and user ${userId} with data: ${JSON.stringify(data)}`);
-                const notifications = await getUserNotifications({ ...data, userId: subAdmin ? subAdmin._id : userId });
-                socket.emit('user-notifications', notifications);
-            } catch (error) {
-                console.log(`Got error in get-user-notifications: ${(JSON.stringify(error?.stack))}`);
-                socket.emit('socket-error', { message: 'Error in fetching notifications.' });
-            }
-        });
 
-        //////////////////////get user unread notifications /////////////////////////
-        socket.on('get-user-unread-notifications', async (data) => {
-            try {
-                console.log(`get-user-unread-notifications event received for socket ${socketId} and user ${userId} with data: ${JSON.stringify(data)}`);
-                const notifications = await getUserUnreadNotifications({ ...data, userId: subAdmin ? subAdmin._id : userId });
-                console.log('notifications', notifications)
-
-                socket.emit('user-unread-notifications', notifications);
-            } catch (error) {
-                console.log(`Got error in get-user-unread-notifications: ${(JSON.stringify(error?.stack))}`);
-                socket.emit('socket-error', { message: 'Error in fetching unread notifications.' });
-            }
-        });
-
-        ////////////////////////// read user notifications ////////////////////////////
-
-        socket.on('read-user-notifications', async (data) => {
-            try {
-                console.log(`read-user-notifications event received for socket ${socketId} and user ${userId} with data: ${JSON.stringify(data)}`);
-                const notifications = await readUserNotifications({ ...data, userId });
-                socket.emit('read-notifications', {
-                    success: notifications,
-                    message: 'Notifications marked as read successfully.',
-                });
-            } catch (error) {
-                console.log(`Got error in read-user-notifications: ${(JSON.stringify(error?.stack))}`);
-                socket.emit('socket-error', { message: 'Error in reading notifications.' });
-            }
-        });
 
     });
 

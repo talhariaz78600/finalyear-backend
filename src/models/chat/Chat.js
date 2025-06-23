@@ -18,10 +18,6 @@ const chatSchema = new Schema(
         required: true
       }
     ],
-    chatType: {
-      type: String,
-      enum: ['contact', 'service'],
-    },
     lastMessage: {
       type: Schema.Types.ObjectId,
       ref: 'Message'

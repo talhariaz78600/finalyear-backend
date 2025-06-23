@@ -4,7 +4,7 @@ require('dotenv').config();
 const http = require('http');
 const AppError = require('../utils/appError');
 const globalErrorHandler = require('../controllers/errorController');
-// const { initializeSocket } = require('../utils/socket');
+const { initializeSocket } = require('../utils/socket');
 
 module.exports = (app) => {
   // Middleware: Track request time
@@ -30,7 +30,7 @@ module.exports = (app) => {
   const server = http.createServer(app);
 
   // Initialize socket if needed
-  // initializeSocket(server);
+  initializeSocket(server);
 
   // Start listening
   const port = process.env.PORT || 3000;

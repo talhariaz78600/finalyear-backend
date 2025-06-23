@@ -20,10 +20,6 @@ const messageSchema = new Schema({
 		ref: 'User',
 		required: true
 	},
-	bookingId: {
-		type: Schema.Types.ObjectId,
-		ref: 'Booking',
-	},
 	contentTitle: {
 		type: String,
 	},
