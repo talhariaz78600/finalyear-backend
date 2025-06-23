@@ -19,7 +19,7 @@ module.exports = (app) => {
     res.send('API is Working.............');
   });
   const openai = new OpenAI({
-    baseURL: process.env.OPENAI_API_BASE_URL ,
+    baseURL: "https://models.github.ai/inference", 
     apiKey: process.env.OPENAI_API_KEY,
   });
   const MODEL = "openai/gpt-4.1-mini";
