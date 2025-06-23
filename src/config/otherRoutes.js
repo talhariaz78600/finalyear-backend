@@ -19,8 +19,8 @@ module.exports = (app) => {
     res.send('API is Working.............');
   });
   const openai = new OpenAI({
-    baseURL: "https://models.github.ai/inference", 
-    apiKey: "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"
+    baseURL: 'https://models.github.ai/inference',
+    apiKey: "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",
   });
   const MODEL = "openai/gpt-4.1-mini";
   app.post('/api/chat', async (req, res) => {
@@ -34,8 +34,6 @@ module.exports = (app) => {
         top_p: 1.0,
         model: MODEL,
       });
-
-      console.log('API Response:', response);
 
       res.json({ message: response?.choices[0]?.message?.content });
     } catch (error) {
