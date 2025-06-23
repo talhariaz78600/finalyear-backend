@@ -20,7 +20,7 @@ module.exports = (app) => {
   });
   const openai = new OpenAI({
     baseURL: 'https://models.github.ai/inference',
-    apiKey: "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",
+    apiKey: process.env.OPENAI_API_KEY,
   });
   const MODEL = "openai/gpt-4.1-mini";
   app.post('/api/chat', async (req, res) => {
