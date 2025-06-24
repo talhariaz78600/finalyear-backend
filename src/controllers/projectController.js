@@ -13,8 +13,16 @@ const createProject = catchAsync(async (req, res, next) => {
     ['title', 'description', 'clientId', 'managerId', 'deadline'],
     s => s.required()
   );
-  const { error } = schema.validate(req.body);
-  if (error) return next(new AppError(joiError(error), 400));
+  const { error } = schema.validate(req.body,{
+    abortEarly: false,
+    allowUnknown: true,
+    stripUnknown: true
+  });
+  
+  if (error) {
+    const errorFields = joiError(error);
+    return next(new AppError("Invalid project data", 400, { fieldErrors: errorFields }));
+  }
 
   const project = await Project.create(req.body);
   return res.status(201).json({
@@ -319,9 +327,9 @@ const getClientProjects = catchAsync(async (req, res, next) => {
   const devId = req.user._id;
   const { status } = req.query;
 
-  if (!mongoose.Types.ObjectId.isValid(devId)) return next(new AppError('Invalid developer ID', 400));
+  if (!mongoose.Types.ObjectId.isValid(devId))
+    return next(new AppError('Invalid developer ID', 400));
 
-  // Build match condition dynamically
   const match = { clientId: new mongoose.Types.ObjectId(devId) };
   if (status) match.status = status;
 
@@ -356,7 +364,33 @@ const getClientProjects = catchAsync(async (req, res, next) => {
             }
           }
         },
-
+        pendingTasks: {
+          $size: {
+            $filter: {
+              input: '$tasks',
+              as: 'task',
+              cond: { $eq: ['$$task.status', 'Pending'] }
+            }
+          }
+        },
+        ongoingTasks: {
+          $size: {
+            $filter: {
+              input: '$tasks',
+              as: 'task',
+              cond: { $eq: ['$$task.status', 'Ongoing'] }
+            }
+          }
+        },
+        onHoldTasks: {
+          $size: {
+            $filter: {
+              input: '$tasks',
+              as: 'task',
+              cond: { $eq: ['$$task.status', 'On Hold'] }
+            }
+          }
+        }
       }
     },
     {
@@ -365,7 +399,8 @@ const getClientProjects = catchAsync(async (req, res, next) => {
           $cond: [
             { $eq: ['$totalTasks', 0] },
             0,
-            { $multiply: [
+            {
+              $multiply: [
                 { $divide: ['$completedTasks', '$totalTasks'] },
                 100
               ]
@@ -376,7 +411,7 @@ const getClientProjects = catchAsync(async (req, res, next) => {
     },
     {
       $project: {
-        tasks: 0, // Exclude tasks from final output
+        tasks: 0 // Exclude task array
       }
     }
   ]);
@@ -387,6 +422,7 @@ const getClientProjects = catchAsync(async (req, res, next) => {
     data: projects
   });
 });
+
 
 
 const updateProjectStatus = catchAsync(async (req, res, next) => {
